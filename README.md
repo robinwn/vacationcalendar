@@ -2,6 +2,8 @@
 
 A comprehensive vacation planning tool designed specifically for British Columbia Government employees. This application provides dynamic statutory holiday calculations, interactive vacation day planning, and automated flex day management - all running locally in your browser with no server required.
 
+(Try it out)[https://robinwn.github.io/vacationcalendar/calendar.html]
+
 ## Features
 
 ### 🎯 Core Functionality
@@ -120,10 +122,6 @@ See the [LICENSE](LICENSE) file for full details.
 Email: robin.windels@gov.bc.ca  
 Created: 2025  
 Version: 1.0
-
-## Contributing
-
-This application is designed specifically for BC Government employees. For updates, documentation, and source code, visit the repository.
 
 ---
 
