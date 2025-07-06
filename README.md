@@ -32,7 +32,7 @@ A comprehensive vacation planning tool designed specifically for British Columbi
 ### Installation
 No installation required! Simply:
 1. Download or clone this repository
-2. Open [`calendar.html`](calendar.html) in any modern web browser
+2. Open [`index.html`](index.html) in any modern web browser
 3. Start planning your vacation days
 
 ### Basic Usage
