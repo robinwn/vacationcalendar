@@ -98,23 +98,45 @@ For updates, documentation, and source code, visit:
 
         .controls {
             display: flex;
-            justify-content: center;
-            align-items: center;
+            flex-direction: column;
             gap: 20px;
             margin-bottom: 30px;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
             flex-wrap: wrap;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 15px;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .control-group-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #667eea;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-right: 10px;
+            white-space: nowrap;
         }
 
         .nav-btn, .mode-btn {
             background: linear-gradient(45deg, #667eea, #764ba2);
             color: white;
             border: none;
-            padding: 12px 24px;
+            padding: 10px 20px;
             border-radius: 25px;
-            font-size: 1rem;
+            font-size: 0.9rem;
             cursor: pointer;
             transition: all 0.3s ease;
             font-weight: 500;
+            white-space: nowrap;
         }
 
         .nav-btn:hover, .mode-btn:hover {
@@ -130,6 +152,22 @@ For updates, documentation, and source code, visit:
 
         .mode-btn.active {
             background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+
+        .vacation-btn {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+        }
+
+        .flex-btn {
+            background: linear-gradient(45deg, #9b59b6, #8e44ad);
+        }
+
+        .clear-btn {
+            background: linear-gradient(45deg, #95a5a6, #7f8c8d);
+        }
+
+        .data-btn {
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
         }
 
         .legend {
@@ -439,8 +477,18 @@ For updates, documentation, and source code, visit:
             }
             
             .controls {
+                gap: 15px;
+            }
+
+            .control-group {
                 flex-direction: column;
-                gap: 10px;
+                align-items: center;
+                padding: 10px;
+            }
+
+            .control-group-title {
+                margin-right: 0;
+                margin-bottom: 5px;
             }
             
             .legend {
@@ -452,6 +500,11 @@ For updates, documentation, and source code, visit:
             .stats {
                 flex-direction: column;
                 gap: 15px;
+            }
+
+            .nav-btn, .mode-btn {
+                font-size: 0.8rem;
+                padding: 8px 16px;
             }
         }
     </style>
@@ -483,20 +536,43 @@ For updates, documentation, and source code, visit:
         </div>
 
         <div class="controls">
-            <button class="nav-btn" onclick="Calendar.changeYear(-1)">← Previous Year</button>
-            <button class="nav-btn" onclick="Calendar.goToCurrentYear()">Current Year</button>
-            <button class="nav-btn" onclick="Calendar.changeYear(1)">Next Year →</button>
-            <button class="mode-btn" id="vacationMode" onclick="AppState.toggleVacationMode()">Vacation Mode: OFF</button>
-            <button class="mode-btn" id="flexMode" onclick="AppState.toggleFlexMode()">Flex Mode: OFF</button>
-            <button class="nav-btn" onclick="Vacation.openPlanModal()">Plan Vacation</button>
-            <button class="nav-btn" onclick="FlexDays.generate()">Generate Flex Days</button>
-            <button class="nav-btn" onclick="FlexDays.openSettingsModal()">Flex Settings</button>
-            <button class="nav-btn" onclick="Vacation.clear()">Clear Vacations</button>
-            <button class="nav-btn" onclick="FlexDays.clear()">Clear Flex Days</button>
-            <button class="nav-btn" onclick="DataManager.exportToJSON()">Export JSON</button>
-            <button class="nav-btn" onclick="document.getElementById('fileInput').click()">Load from JSON</button>
-            <button class="nav-btn" onclick="Storage.clear()">Clear Saved Data</button>
+            <!-- Navigation Controls -->
+            <div class="control-group">
+                <span class="control-group-title">Navigation</span>
+                <button class="nav-btn" onclick="Calendar.changeYear(-1)">← Previous Year</button>
+                <button class="nav-btn" onclick="Calendar.goToCurrentYear()">Current Year</button>
+                <button class="nav-btn" onclick="Calendar.changeYear(1)">Next Year →</button>
+            </div>
+
+            <!-- Vacation Management -->
+            <div class="control-group">
+                <span class="control-group-title">Vacation</span>
+                <button class="mode-btn" id="vacationMode" onclick="AppState.toggleVacationMode()">Vacation Mode: OFF</button>
+                <button class="nav-btn vacation-btn" onclick="Vacation.openPlanModal()">Plan Vacation</button>
+                <button class="nav-btn clear-btn" onclick="Vacation.clear()">Clear Vacations</button>
+            </div>
+
+            <!-- Flex Day Management -->
+            <div class="control-group">
+                <span class="control-group-title">Flex Days</span>
+                <button class="mode-btn" id="flexMode" onclick="AppState.toggleFlexMode()">Flex Mode: OFF</button>
+                <button class="nav-btn flex-btn" onclick="FlexDays.generate()">Generate Flex Days</button>
+                <button class="nav-btn flex-btn" onclick="FlexDays.openSettingsModal()">Flex Settings</button>
+                <button class="nav-btn clear-btn" onclick="FlexDays.clear()">Clear Flex Days</button>
+            </div>
+
+            <!-- Data Management -->
+            <div class="control-group">
+                <span class="control-group-title">Data</span>
+                <button class="nav-btn data-btn" onclick="DataManager.exportToJSON()">Export JSON</button>
+                <button class="nav-btn data-btn" onclick="document.getElementById('fileInput').click()">Load from JSON</button>
+                <button class="nav-btn clear-btn" onclick="Storage.clear()">Clear Saved Data</button>
+            </div>
         </div>
+
+        <p style="text-align: center; color: #667eea; font-size: 0.9rem; margin-bottom: 15px;">
+            📱 <strong>Source Code:</strong> <a href="https://github.com/robinwn/vacationcalendar" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 600;">github.com/robinwn/vacationcalendar</a>
+        </p>
 
         <p style="text-align: center; color: #666; font-size: 0.9rem; margin-bottom: 20px;">
             💡 <strong>Tip:</strong> In Vacation Mode, click weekdays to mark vacation days. Holidays, flex days, and weekends are not allowed.
