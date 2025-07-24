@@ -1,23 +1,24 @@
 <!DOCTYPE html>
 <!--
 ================================================================================
-Calendar Application with Holidays & Vacation Planning
+Calendar Application with Holidays, Vacation Planning & Staff Coverage
 ================================================================================
 
 Author: Robin Windels
 Email: robin.windels@gov.bc.ca
 Created: 2025
-Version: 1.0
+Version: 1.1
 
 Description:
-A calendar application for managing vacation days, flex days, and 
-statutory holidays for British Columbia.
+A calendar application for managing vacation days, flex days, staff coverage,
+and statutory holidays for British Columbia.
 It runs fully locally, no server required.  Run it from Github or
 download it and doubleclick.
 
 Features:
 - Dynamic BC statutory holiday calculation
 - Interactive vacation day planning
+- Staff coverage tracking with names
 - Automated flex day generation with customizable schedules
 - Local storage with JSON import/export
 - Responsive design for desktop and mobile
@@ -50,7 +51,7 @@ For updates, documentation, and source code, visit:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2025 Calendar with Holidays & Vacation</title>
+    <title>2025 Calendar with Holidays, Vacation & Coverage</title>
     <style>
         * {
             box-sizing: border-box;
@@ -162,6 +163,10 @@ For updates, documentation, and source code, visit:
             background: linear-gradient(45deg, #9b59b6, #8e44ad);
         }
 
+        .covering-btn {
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+        }
+
         .clear-btn {
             background: linear-gradient(45deg, #95a5a6, #7f8c8d);
         }
@@ -198,6 +203,7 @@ For updates, documentation, and source code, visit:
         .legend-holiday { background: linear-gradient(45deg, #e74c3c, #c0392b); }
         .legend-vacation { background: linear-gradient(45deg, #f39c12, #e67e22); }
         .legend-flex { background: linear-gradient(45deg, #9b59b6, #8e44ad); }
+        .legend-covering { background: linear-gradient(45deg, #27ae60, #2ecc71); }
         .legend-weekend { background: linear-gradient(45deg, #95a5a6, #7f8c8d); }
 
         .calendar-grid {
@@ -286,7 +292,13 @@ For updates, documentation, and source code, visit:
             font-weight: bold;
         }
 
-        .calendar-table td.weekend:not(.holiday):not(.vacation):not(.flex) {
+        .calendar-table td.covering {
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+            color: white;
+            font-weight: bold;
+        }
+
+        .calendar-table td.weekend:not(.holiday):not(.vacation):not(.flex):not(.covering) {
             background: linear-gradient(45deg, #95a5a6, #7f8c8d);
             color: white;
         }
@@ -301,6 +313,10 @@ For updates, documentation, and source code, visit:
 
         .calendar-table td.flex:hover {
             background: linear-gradient(45deg, #8e44ad, #7d3c98);
+        }
+
+        .calendar-table td.covering:hover {
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
         }
 
         .date-tooltip {
@@ -530,6 +546,10 @@ For updates, documentation, and source code, visit:
                 <div class="stat-label">Flex Days</div>
             </div>
             <div class="stat-item">
+                <div class="stat-number" id="coveringCount">0</div>
+                <div class="stat-label">Coverage Days</div>
+            </div>
+            <div class="stat-item">
                 <div class="stat-number" id="workingDays">0</div>
                 <div class="stat-label">Working Days</div>
             </div>
@@ -561,6 +581,14 @@ For updates, documentation, and source code, visit:
                 <button class="nav-btn clear-btn" onclick="FlexDays.clear()">Clear Flex Days</button>
             </div>
 
+            <!-- Staff Coverage Management -->
+            <div class="control-group">
+                <span class="control-group-title">Staff Coverage</span>
+                <button class="mode-btn" id="coveringMode" onclick="AppState.toggleCoveringMode()">Coverage Mode: OFF</button>
+                <button class="nav-btn covering-btn" onclick="Coverage.openPlanModal()">Plan Coverage</button>
+                <button class="nav-btn clear-btn" onclick="Coverage.clear()">Clear Coverage</button>
+            </div>
+
             <!-- Data Management -->
             <div class="control-group">
                 <span class="control-group-title">Data</span>
@@ -575,7 +603,7 @@ For updates, documentation, and source code, visit:
         </p>
 
         <p style="text-align: center; color: #666; font-size: 0.9rem; margin-bottom: 20px;">
-            💡 <strong>Tip:</strong> In Vacation Mode, click weekdays to mark vacation days. Holidays, flex days, and weekends are not allowed.
+            💡 <strong>Tip:</strong> Use different modes to mark days. Vacation & Flex: click weekdays to toggle. Coverage: click weekdays and enter staff name. Holidays, vacation days, flex days, and weekends are protected.
         </p>
 
         <div class="legend">
@@ -596,6 +624,10 @@ For updates, documentation, and source code, visit:
                 <span>Flex Day</span>
             </div>
             <div class="legend-item">
+                <div class="legend-color legend-covering"></div>
+                <span>Staff Coverage</span>
+            </div>
+            <div class="legend-item">
                 <div class="legend-color legend-weekend"></div>
                 <span>Weekend</span>
             </div>
@@ -612,7 +644,7 @@ For updates, documentation, and source code, visit:
         // ===== CONFIGURATION & CONSTANTS =====
         const CONFIG = {
             STORAGE_KEY: 'calendar-data',
-            VERSION: '1.0',
+            VERSION: '1.1',
             MAX_SEARCH_DAYS: 10,
             DEFAULT_FLEX_PERIOD: 14,
             NOTIFICATION_DURATION: 4000
@@ -823,12 +855,15 @@ For updates, documentation, and source code, visit:
                 return holidays;
             }
         };
+        
         const AppState = {
             currentYear: 2025,
             vacationMode: false,
             flexMode: false,
+            coveringMode: false,
             vacationDays: {},
             flexDays: {},
+            coveringDays: {},
             flexSettings: {
                 startDate: '2025-01-03',
                 periodDays: 14
@@ -856,15 +891,34 @@ For updates, documentation, and source code, visit:
                 Storage.save();
             },
 
+            setCoveringDay(dateKey, name) {
+                this.coveringDays[dateKey] = name;
+                Storage.save();
+            },
+
+            removeCoveringDay(dateKey) {
+                delete this.coveringDays[dateKey];
+                Storage.save();
+            },
+
             toggleVacationMode() {
                 this.vacationMode = !this.vacationMode;
                 this.flexMode = false;
+                this.coveringMode = false;
                 UI.updateModeButtons();
             },
 
             toggleFlexMode() {
                 this.flexMode = !this.flexMode;
                 this.vacationMode = false;
+                this.coveringMode = false;
+                UI.updateModeButtons();
+            },
+
+            toggleCoveringMode() {
+                this.coveringMode = !this.coveringMode;
+                this.vacationMode = false;
+                this.flexMode = false;
                 UI.updateModeButtons();
             },
 
@@ -916,6 +970,11 @@ For updates, documentation, and source code, visit:
                 return AppState.flexDays[dateKey];
             },
 
+            isCovering(year, month, day) {
+                const dateKey = this.getDateKey(year, month, day);
+                return AppState.coveringDays[dateKey];
+            },
+
             isToday(year, month, day) {
                 return year === AppState.today.getFullYear() && 
                        month === AppState.today.getMonth() && 
@@ -961,6 +1020,9 @@ For updates, documentation, and source code, visit:
                 const flexCount = Object.keys(AppState.flexDays).filter(key => 
                     key.startsWith(AppState.currentYear.toString())).length;
                 
+                const coveringCount = Object.keys(AppState.coveringDays).filter(key => 
+                    key.startsWith(AppState.currentYear.toString())).length;
+                
                 const totalDays = new Date(AppState.currentYear, 11, 31).getDate() === 31 ? 
                     (AppState.currentYear % 4 === 0 ? 366 : 365) : 365;
                 const weekends = Math.floor(totalDays / 7) * 2;
@@ -969,18 +1031,23 @@ For updates, documentation, and source code, visit:
                 document.getElementById('holidayCount').textContent = holidayCount;
                 document.getElementById('vacationCount').textContent = vacationCount;
                 document.getElementById('flexCount').textContent = flexCount;
+                document.getElementById('coveringCount').textContent = coveringCount;
                 document.getElementById('workingDays').textContent = Math.max(0, workingDays);
             },
 
             updateModeButtons() {
                 const vacationBtn = document.getElementById('vacationMode');
                 const flexBtn = document.getElementById('flexMode');
+                const coveringBtn = document.getElementById('coveringMode');
                 
                 vacationBtn.textContent = `Vacation Mode: ${AppState.vacationMode ? 'ON' : 'OFF'}`;
                 vacationBtn.classList.toggle('active', AppState.vacationMode);
                 
                 flexBtn.textContent = `Flex Mode: ${AppState.flexMode ? 'ON' : 'OFF'}`;
                 flexBtn.classList.toggle('active', AppState.flexMode);
+
+                coveringBtn.textContent = `Coverage Mode: ${AppState.coveringMode ? 'ON' : 'OFF'}`;
+                coveringBtn.classList.toggle('active', AppState.coveringMode);
             },
 
             updateCurrentDate() {
@@ -1003,12 +1070,14 @@ For updates, documentation, and source code, visit:
                 const holiday = DateUtils.getHolidayName(year, month, day);
                 const vacation = DateUtils.isVacation(year, month, day);
                 const flex = DateUtils.isFlex(year, month, day);
+                const covering = DateUtils.isCovering(year, month, day);
                 const weekend = DateUtils.isWeekend(year, month, day);
 
                 let tooltipText = '';
                 if (holiday) tooltipText = holiday;
                 else if (vacation) tooltipText = vacation;
                 else if (flex) tooltipText = flex;
+                else if (covering) tooltipText = `Covering: ${covering}`;
                 else if (weekend) tooltipText = 'Weekend';
 
                 if (tooltipText) {
@@ -1027,6 +1096,7 @@ For updates, documentation, and source code, visit:
                     const calendarData = {
                         vacationDays: AppState.vacationDays,
                         flexDays: AppState.flexDays,
+                        coveringDays: AppState.coveringDays,
                         flexSettings: AppState.flexSettings,
                         currentYear: AppState.currentYear,
                         lastSaved: new Date().toISOString(),
@@ -1055,6 +1125,10 @@ For updates, documentation, and source code, visit:
                         AppState.flexDays = calendarData.flexDays;
                     }
                     
+                    if (calendarData.coveringDays) {
+                        AppState.coveringDays = calendarData.coveringDays;
+                    }
+                    
                     if (calendarData.flexSettings) {
                         AppState.flexSettings = calendarData.flexSettings;
                     }
@@ -1065,9 +1139,10 @@ For updates, documentation, and source code, visit:
                     
                     const vacationCount = Object.keys(AppState.vacationDays).length;
                     const flexCount = Object.keys(AppState.flexDays).length;
+                    const coveringCount = Object.keys(AppState.coveringDays).length;
                     
-                    if (vacationCount > 0 || flexCount > 0) {
-                        UI.showNotification(`Calendar data restored! Vacation: ${vacationCount} | Flex: ${flexCount}`);
+                    if (vacationCount > 0 || flexCount > 0 || coveringCount > 0) {
+                        UI.showNotification(`Calendar data restored! Vacation: ${vacationCount} | Flex: ${flexCount} | Coverage: ${coveringCount}`);
                     }
                     
                     return true;
@@ -1193,6 +1268,7 @@ For updates, documentation, and source code, visit:
                 const holiday = DateUtils.isHoliday(year, month, day);
                 const vacation = DateUtils.isVacation(year, month, day);
                 const flex = DateUtils.isFlex(year, month, day);
+                const covering = DateUtils.isCovering(year, month, day);
                 const weekend = DateUtils.isWeekend(year, month, day);
                 const isToday = DateUtils.isToday(year, month, day);
                 
@@ -1202,6 +1278,8 @@ For updates, documentation, and source code, visit:
                     cell.className = 'vacation';
                 } else if (flex) {
                     cell.className = 'flex';
+                } else if (covering) {
+                    cell.className = 'covering';
                 } else if (weekend) {
                     cell.className = 'weekend';
                 }
@@ -1229,20 +1307,23 @@ For updates, documentation, and source code, visit:
                 const dateKey = DateUtils.getDateKey(year, month, day);
                 const holiday = DateUtils.isHoliday(year, month, day);
                 const flex = DateUtils.isFlex(year, month, day);
+                const vacation = DateUtils.isVacation(year, month, day);
+                const covering = DateUtils.isCovering(year, month, day);
                 const weekend = DateUtils.isWeekend(year, month, day);
                 
                 if (AppState.vacationMode) {
-                    if (holiday || flex || weekend) {
+                    if (holiday || flex || covering || weekend) {
                         let dayType = '';
                         if (holiday) dayType = 'statutory holiday';
                         else if (flex) dayType = 'flex day';
+                        else if (covering) dayType = 'coverage day';
                         else if (weekend) dayType = 'weekend';
                         
                         UI.showNotification(`Cannot mark vacation on ${dayType}`, true);
                         return;
                     }
                     
-                    if (AppState.vacationDays[dateKey]) {
+                    if (vacation) {
                         AppState.removeVacationDay(dateKey);
                         cell.classList.remove('vacation');
                         UI.showNotification('Vacation day removed');
@@ -1264,20 +1345,58 @@ For updates, documentation, and source code, visit:
                         return;
                     }
                     
-                    if (AppState.flexDays[dateKey]) {
+                    if (flex) {
                         AppState.removeFlexDay(dateKey);
                         cell.classList.remove('flex');
                         UI.showNotification('Flex day removed');
                     } else {
                         AppState.setFlexDay(dateKey, 'Flex Day');
                         cell.classList.add('flex');
-                        if (AppState.vacationDays[dateKey]) {
+                        
+                        // Remove other types if they exist
+                        if (vacation) {
                             AppState.removeVacationDay(dateKey);
                             cell.classList.remove('vacation');
                             UI.showNotification('Flex day added (replaced vacation day)');
+                        } else if (covering) {
+                            AppState.removeCoveringDay(dateKey);
+                            cell.classList.remove('covering');
+                            UI.showNotification('Flex day added (replaced coverage day)');
                         } else {
                             UI.showNotification('Flex day added');
                         }
+                    }
+                    
+                    UI.createTooltip(cell, year, month, day);
+                    UI.updateStats();
+                } else if (AppState.coveringMode) {
+                    if (holiday || flex || vacation || weekend) {
+                        let dayType = '';
+                        if (holiday) dayType = 'statutory holiday';
+                        else if (flex) dayType = 'flex day';
+                        else if (vacation) dayType = 'vacation day';
+                        else if (weekend) dayType = 'weekend';
+                        
+                        UI.showNotification(`Cannot mark coverage on ${dayType}`, true);
+                        return;
+                    }
+                    
+                    if (covering) {
+                        AppState.removeCoveringDay(dateKey);
+                        cell.classList.remove('covering');
+                        UI.showNotification('Coverage day removed');
+                    } else {
+                        // Prompt for staff name when adding coverage
+                        const staffName = prompt('Enter the name of the person you are covering for:');
+                        
+                        if (!staffName || !staffName.trim()) {
+                            UI.showNotification('Coverage cancelled - no name provided', true);
+                            return;
+                        }
+                        
+                        AppState.setCoveringDay(dateKey, staffName.trim());
+                        cell.classList.add('covering');
+                        UI.showNotification(`Coverage for ${staffName.trim()} added`);
                     }
                     
                     UI.createTooltip(cell, year, month, day);
@@ -1312,6 +1431,7 @@ For updates, documentation, and source code, visit:
                 let addedDays = 0;
                 let movedDays = 0;
                 let replacedVacations = 0;
+                let replacedCoverage = 0;
                 
                 let flexDate = new Date(baseStartDate);
                 
@@ -1358,6 +1478,11 @@ For updates, documentation, and source code, visit:
                             replacedVacations++;
                         }
                         
+                        if (AppState.coveringDays[finalDateKey]) {
+                            delete AppState.coveringDays[finalDateKey];
+                            replacedCoverage++;
+                        }
+                        
                         AppState.flexDays[finalDateKey] = 'Flex Day';
                         addedDays++;
                     }
@@ -1374,6 +1499,9 @@ For updates, documentation, and source code, visit:
                 }
                 if (replacedVacations > 0) {
                     message += ` (${replacedVacations} replaced vacation days)`;
+                }
+                if (replacedCoverage > 0) {
+                    message += ` (${replacedCoverage} replaced coverage days)`;
                 }
                 UI.showNotification(message);
             },
@@ -1526,7 +1654,8 @@ For updates, documentation, and source code, visit:
                 let skippedDetails = {
                     holidays: 0,
                     weekends: 0,
-                    flexDays: 0
+                    flexDays: 0,
+                    coveringDays: 0
                 };
                 
                 // Use a safer date iteration method
@@ -1539,9 +1668,10 @@ For updates, documentation, and source code, visit:
                     
                     const holiday = DateUtils.isHoliday(year, month, day);
                     const flex = DateUtils.isFlex(year, month, day);
+                    const covering = DateUtils.isCovering(year, month, day);
                     const weekend = DateUtils.isWeekend(year, month, day);
                     
-                    // Only add vacation days on working days (not holidays, weekends, or flex days)
+                    // Only add vacation days on working days (not holidays, weekends, flex days, or coverage days)
                     if (holiday) {
                         skippedDays++;
                         skippedDetails.holidays++;
@@ -1551,6 +1681,9 @@ For updates, documentation, and source code, visit:
                     } else if (flex) {
                         skippedDays++;
                         skippedDetails.flexDays++;
+                    } else if (covering) {
+                        skippedDays++;
+                        skippedDetails.coveringDays++;
                     } else {
                         // This is a working day - add vacation
                         AppState.vacationDays[dateKey] = vacationName;
@@ -1579,6 +1712,9 @@ For updates, documentation, and source code, visit:
                     if (skippedDetails.flexDays > 0) {
                         skippedParts.push(`${skippedDetails.flexDays} flex day${skippedDetails.flexDays > 1 ? 's' : ''}`);
                     }
+                    if (skippedDetails.coveringDays > 0) {
+                        skippedParts.push(`${skippedDetails.coveringDays} coverage day${skippedDetails.coveringDays > 1 ? 's' : ''}`);
+                    }
                     
                     message += ` (skipped ${skippedParts.join(', ')})`;
                 }
@@ -1594,6 +1730,158 @@ For updates, documentation, and source code, visit:
             }
         };
 
+        // ===== STAFF COVERAGE MANAGEMENT =====
+        const Coverage = {
+            openPlanModal() {
+                const existingModal = document.getElementById('coverageModal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+
+                const modalHTML = `
+                    <div class="vacation-modal" id="coverageModal" style="display: flex;">
+                        <div class="modal-content">
+                            <div class="modal-header">Plan Staff Coverage</div>
+                            <div class="form-group">
+                                <label for="coverageStart">Start Date:</label>
+                                <input type="date" id="coverageStart">
+                            </div>
+                            <div class="form-group">
+                                <label for="coverageEnd">End Date:</label>
+                                <input type="date" id="coverageEnd">
+                            </div>
+                            <div class="form-group">
+                                <label for="coveringFor">Covering For (Staff Name):</label>
+                                <input type="text" id="coveringFor" placeholder="e.g., John Smith, Sarah Jones" required>
+                                <small style="color: #666; font-size: 0.8rem;">Enter the name of the person you are covering for</small>
+                            </div>
+                            <div class="modal-buttons">
+                                <button class="btn btn-secondary" onclick="Coverage.closePlanModal()">Cancel</button>
+                                <button class="btn btn-primary" onclick="Coverage.addCoverage()">Add Coverage</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+                const modal = document.getElementById('coverageModal');
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        Coverage.closePlanModal();
+                    }
+                });
+            },
+
+            closePlanModal() {
+                const modal = document.getElementById('coverageModal');
+                if (modal) {
+                    modal.remove();
+                }
+            },
+
+            addCoverage() {
+                const startDate = document.getElementById('coverageStart').value;
+                const endDate = document.getElementById('coverageEnd').value;
+                const coveringFor = document.getElementById('coveringFor').value.trim();
+                
+                if (!startDate || !endDate) {
+                    UI.showNotification('Please select both start and end dates.', true);
+                    return;
+                }
+                
+                if (!coveringFor) {
+                    UI.showNotification('Please enter the name of the person you are covering for.', true);
+                    return;
+                }
+                
+                const start = new Date(startDate + 'T12:00:00');
+                const end = new Date(endDate + 'T12:00:00');
+                
+                if (start > end) {
+                    UI.showNotification('Start date must be before end date.', true);
+                    return;
+                }
+                
+                let addedDays = 0;
+                let skippedDays = 0;
+                let skippedDetails = {
+                    holidays: 0,
+                    weekends: 0,
+                    vacationDays: 0,
+                    flexDays: 0
+                };
+                
+                const currentDate = new Date(start);
+                while (currentDate <= end) {
+                    const year = currentDate.getFullYear();
+                    const month = currentDate.getMonth();
+                    const day = currentDate.getDate();
+                    const dateKey = DateUtils.getDateKey(year, month, day);
+                    
+                    const holiday = DateUtils.isHoliday(year, month, day);
+                    const weekend = DateUtils.isWeekend(year, month, day);
+                    const vacation = DateUtils.isVacation(year, month, day);
+                    const flex = DateUtils.isFlex(year, month, day);
+                    
+                    if (holiday) {
+                        skippedDays++;
+                        skippedDetails.holidays++;
+                    } else if (weekend) {
+                        skippedDays++;
+                        skippedDetails.weekends++;
+                    } else if (vacation) {
+                        skippedDays++;
+                        skippedDetails.vacationDays++;
+                    } else if (flex) {
+                        skippedDays++;
+                        skippedDetails.flexDays++;
+                    } else {
+                        // This is a working day - add coverage
+                        AppState.coveringDays[dateKey] = coveringFor;
+                        addedDays++;
+                    }
+                    
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                
+                Calendar.generate(AppState.currentYear);
+                this.closePlanModal();
+                Storage.save();
+                
+                let message = `Added ${addedDays} coverage days for ${coveringFor}`;
+                
+                if (skippedDays > 0) {
+                    let skippedParts = [];
+                    if (skippedDetails.holidays > 0) {
+                        skippedParts.push(`${skippedDetails.holidays} holiday${skippedDetails.holidays > 1 ? 's' : ''}`);
+                    }
+                    if (skippedDetails.weekends > 0) {
+                        skippedParts.push(`${skippedDetails.weekends} weekend day${skippedDetails.weekends > 1 ? 's' : ''}`);
+                    }
+                    if (skippedDetails.vacationDays > 0) {
+                        skippedParts.push(`${skippedDetails.vacationDays} vacation day${skippedDetails.vacationDays > 1 ? 's' : ''}`);
+                    }
+                    if (skippedDetails.flexDays > 0) {
+                        skippedParts.push(`${skippedDetails.flexDays} flex day${skippedDetails.flexDays > 1 ? 's' : ''}`);
+                    }
+                    
+                    if (skippedParts.length > 0) {
+                        message += ` (skipped ${skippedParts.join(', ')})`;
+                    }
+                }
+                
+                UI.showNotification(message);
+            },
+
+            clear() {
+                AppState.coveringDays = {};
+                Calendar.generate(AppState.currentYear);
+                Storage.save();
+                UI.showNotification('All coverage days cleared');
+            }
+        };
+
         // ===== IMPORT/EXPORT =====
         const DataManager = {
             exportToJSON() {
@@ -1604,7 +1892,7 @@ For updates, documentation, and source code, visit:
                     const currentYearVacations = {};
                     const vacationEntries = Object.entries(AppState.vacationDays)
                         .filter(([date, name]) => date.startsWith(AppState.currentYear.toString()))
-                        .sort(([a], [b]) => a.localeCompare(b)); // Sort by date key
+                        .sort(([a], [b]) => a.localeCompare(b));
                     
                     vacationEntries.forEach(([date, name]) => {
                         currentYearVacations[date] = name;
@@ -1614,10 +1902,20 @@ For updates, documentation, and source code, visit:
                     const currentYearFlex = {};
                     const flexEntries = Object.entries(AppState.flexDays)
                         .filter(([date, name]) => date.startsWith(AppState.currentYear.toString()))
-                        .sort(([a], [b]) => a.localeCompare(b)); // Sort by date key
+                        .sort(([a], [b]) => a.localeCompare(b));
                     
                     flexEntries.forEach(([date, name]) => {
                         currentYearFlex[date] = name;
+                    });
+
+                    // Get current year coverage days and sort by date
+                    const currentYearCoverage = {};
+                    const coverageEntries = Object.entries(AppState.coveringDays)
+                        .filter(([date, name]) => date.startsWith(AppState.currentYear.toString()))
+                        .sort(([a], [b]) => a.localeCompare(b));
+                    
+                    coverageEntries.forEach(([date, name]) => {
+                        currentYearCoverage[date] = name;
                     });
 
                     const jsonData = {
@@ -1626,18 +1924,20 @@ For updates, documentation, and source code, visit:
                             calendar_year: AppState.currentYear,
                             total_vacation_days: Object.keys(currentYearVacations).length,
                             total_flex_days: Object.keys(currentYearFlex).length,
+                            total_coverage_days: Object.keys(currentYearCoverage).length,
                             export_format: "json",
                             version: CONFIG.VERSION
                         },
                         flex_settings: AppState.flexSettings,
                         vacation_days: currentYearVacations,
-                        flex_days: currentYearFlex
+                        flex_days: currentYearFlex,
+                        covering_days: currentYearCoverage
                     };
 
                     const jsonContent = JSON.stringify(jsonData, null, 2);
                     this.createJSONModal(jsonContent);
 
-                    UI.showNotification(`JSON generated for ${AppState.currentYear} | Vacation: ${Object.keys(currentYearVacations).length} | Flex: ${Object.keys(currentYearFlex).length}`);
+                    UI.showNotification(`JSON generated for ${AppState.currentYear} | Vacation: ${Object.keys(currentYearVacations).length} | Flex: ${Object.keys(currentYearFlex).length} | Coverage: ${Object.keys(currentYearCoverage).length}`);
                     
                 } catch (error) {
                     console.error('Error generating JSON:', error);
@@ -1729,6 +2029,10 @@ For updates, documentation, and source code, visit:
                             AppState.flexDays = { ...AppState.flexDays, ...data.flex_days };
                         }
                         
+                        if (data.covering_days) {
+                            AppState.coveringDays = { ...AppState.coveringDays, ...data.covering_days };
+                        }
+                        
                         if (data.metadata && data.metadata.calendar_year) {
                             AppState.setYear(data.metadata.calendar_year);
                         }
@@ -1737,10 +2041,11 @@ For updates, documentation, and source code, visit:
                         
                         const vacationCount = Object.keys(data.vacation_days || {}).length;
                         const flexCount = Object.keys(data.flex_days || {}).length;
+                        const coveringCount = Object.keys(data.covering_days || {}).length;
                         
                         Storage.save();
                         
-                        UI.showNotification(`Calendar data loaded successfully! Vacation: ${vacationCount} | Flex: ${flexCount}`);
+                        UI.showNotification(`Calendar data loaded successfully! Vacation: ${vacationCount} | Flex: ${flexCount} | Coverage: ${coveringCount}`);
                         
                     } catch (error) {
                         UI.showNotification('Error loading JSON file: ' + error.message, true);
